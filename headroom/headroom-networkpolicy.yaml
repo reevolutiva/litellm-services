@@ -1,0 +1,42 @@
+---
+# El acceso a headroom se cierra por red, no por credencial.
+#
+# Contexto: headroom bindea `0.0.0.0:8787` sin token (su propio aviso de arranque dice
+# `/v1/* is UNAUTHENTICATED`), porque el guardrail de LiteLLM lo llama desde otro pod.
+# Poner un token en el servidor exigiría setear `auth_token` en la fila del guardrail
+# del PostgreSQL — justo lo que este cambio evita tocar.
+#
+# Esto es aceptable SOLO si la policy se aplica de verdad: una NetworkPolicy que no se
+# fuerza da una falsa sensación de cierre, y este repo ya tiene la lección del gate que
+# no falla ("un gate que no falla no es un gate"). Por eso la carta lleva la prueba en
+# negativo como criterio `[host]`: desde un pod del clúster que NO sea el de LiteLLM,
+# `wget -T3 -qO- http://headroom.litellm.svc.cluster.local:8787/readyz` tiene que
+# **fallar**, y desde el pod de LiteLLM tiene que responder 200.
+#
+# Si k3s no estuviera forzando policies (el controlador viene habilitado por defecto,
+# pero hay que probarlo), el plan B es: `HEADROOM_PROXY_TOKEN` en el Deployment +
+# `auth_token` en la fila del guardrail. Se decide con la prueba en mano, no antes.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: headroom-solo-desde-litellm
+  namespace: litellm
+  labels:
+    app.kubernetes.io/name: headroom
+    app.kubernetes.io/part-of: headroom
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: headroom
+  policyTypes:
+    - Ingress
+  ingress:
+    # Solo el proxy. Las etiquetas son las que el chart de LiteLLM pone a su pod
+    # (verificado contra el selector de su Service en el clúster).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: litellm
+      ports:
+        - protocol: TCP
+          port: 8787

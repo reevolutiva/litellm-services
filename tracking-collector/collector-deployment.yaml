@@ -1,0 +1,144 @@
+# =============================================================================
+# Contenedor server-side de tracking (T0.6).
+#
+# Stateless: sin PVC, sin estado en disco, `readOnlyRootFilesystem` — el pod se
+# puede borrar y recrear en cualquier nodo sin perder nada. Lo único con estado
+# es la caché de deduplicación, en memoria y acotada, y perderla no pierde
+# eventos (solo debilita la segunda línea contra duplicados).
+#
+# Dos réplicas + HPA: la escala es horizontal y trivial porque no hay afinidad
+# de sesión: cualquier réplica puede atender cualquier evento.
+#
+# El contenedor es síncrono contra Matomo a propósito: si Matomo no acepta el
+# evento, responde 502 y el emisor reintenta (el plugin reprograma, el navegador
+# reenvía) — y libera la reserva de deduplicación, así que el reintento sí
+# vuelve a entrar. Aceptar en silencio sería perder eventos sin enterarse.
+#
+# La ubicación NO se declara acá (regla 6 de AGENTS.md): el nodo por defecto es
+# `imac27` y esta carga no necesita producción, así que no lleva nodeSelector.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tracking-collector
+  namespace: tracking
+  labels:
+    app.kubernetes.io/name: tracking-collector
+    app.kubernetes.io/part-of: tracking
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tracking-collector
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tracking-collector
+        app.kubernetes.io/part-of: tracking
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: collector
+          image: registry.coyote-paridae.ts.net/tracking-collector:0.1.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # El destino es la instancia central de Matomo (`analytics`, T2.9).
+            # Cambiar de destino es cambiar esta línea: el contenedor no sabe de
+            # más de un Matomo ni lo necesita.
+            - name: MATOMO_URL
+              value: http://matomo.analytics.svc.cluster.local
+            - name: SITES_FILE
+              value: /etc/tracking/sites.json
+            - name: SITE_TOKENS_FILE
+              value: /etc/tracking/secrets/sites-tokens.json
+            # Un sitio sin token no puede emitir: el REST del sitio es público.
+            - name: REQUIRE_SITE_TOKEN
+              value: "1"
+            - name: FORWARD_TIMEOUT_SECONDS
+              value: "5"
+            - name: FORWARD_RETRIES
+              value: "2"
+            - name: DEDUPE_TTL_SECONDS
+              value: "86400"
+            - name: DEDUPE_MAX_ENTRIES
+              value: "50000"
+            # Dimensiones personalizadas del §5.4, con los ids del data layer map
+            # (`plantillas/data_layer_map.yaml`, T1.1). Los ids son del destino:
+            # Matomo los asigna al crearlas, así que viven en configuración y no
+            # en el código. `none` desactiva el envío (y el arranque lo avisa).
+            - name: MATOMO_DIMENSIONS
+              value: '{"producto_slug":1,"cohorte_slug":2,"tramo_id":3,"consultor_slug":4,"evento_id":5}'
+            # El token de Matomo va por `secretKeyRef` y no por `envFrom`: la
+            # otra clave de ese Secret es `sites-tokens.json`, que no es un
+            # nombre de variable válido y haría fallar la creación del pod.
+            # `optional: true` = el contenedor arranca degradado y lo dice, en
+            # vez de quedar en CrashLoopBackOff cuando AKV todavía no tiene el
+            # token (el aviso queda en el log del arranque).
+            - name: MATOMO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tracking-collector-secrets
+                  key: matomo-token
+                  optional: true
+          volumeMounts:
+            - name: config
+              mountPath: /etc/tracking
+              readOnly: true
+            - name: secrets
+              mountPath: /etc/tracking/secrets
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: 10
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+      volumes:
+        - name: config
+          configMap:
+            name: tracking-collector-config
+        - name: secrets
+          secret:
+            secretName: tracking-collector-secrets
+            optional: true
+        - name: tmp
+          emptyDir: {}

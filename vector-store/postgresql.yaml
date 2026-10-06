@@ -1,0 +1,129 @@
+# PostgreSQL/PGVector dedicado a la memoria de Hermes/Mem0.
+# Vive en `desarrollo` mediante el patch de `apps-vectorstore` en clusters/imac27/apps.yaml.
+# No comparte Deployment, PVC, usuario ni base con el PostgreSQL de LiteLLM.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vectorstore-postgresql-init
+  namespace: databases
+data:
+  01-vectorstore.sql: |
+    -- The extension MUST live in the same schema the application uses.
+    -- Prisma derives its `search_path` from the `?schema=` parameter of
+    -- DATABASE_URL (`vectorstore`), so a `vector` type installed into `public`
+    -- is invisible to it and `prisma db push` fails with
+    -- `ERROR: type "vector" does not exist`. Creating the schema first is a
+    -- prerequisite: the extension is installed INTO it.
+    CREATE SCHEMA IF NOT EXISTS vectorstore AUTHORIZATION vectorstore;
+    CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA vectorstore;
+    -- POSTGRES_USER is a bootstrap superuser; the application keeps only schema ownership.
+    ALTER ROLE vectorstore WITH NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vectorstore-postgresql-data
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: vectorstore-postgresql
+    app.kubernetes.io/part-of: vector-store
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vectorstore-postgresql
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: vectorstore-postgresql
+    app.kubernetes.io/part-of: vector-store
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vectorstore-postgresql
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vectorstore-postgresql
+        app.kubernetes.io/part-of: vector-store
+    spec:
+      containers:
+        - name: postgresql
+          image: pgvector/pgvector:pg16
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: vectorstore
+            - name: POSTGRES_DB
+              value: vectorstore
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: vectorstore-postgresql-creds
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-U", "vectorstore", "-d", "vectorstore"]
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "vectorstore", "-d", "vectorstore"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "vectorstore", "-d", "vectorstore"]
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 1Gi
+              cpu: 1
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: vectorstore-postgresql-data
+        - name: init-scripts
+          configMap:
+            name: vectorstore-postgresql-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vectorstore-postgresql
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: vectorstore-postgresql
+    app.kubernetes.io/part-of: vector-store
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: vectorstore-postgresql
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

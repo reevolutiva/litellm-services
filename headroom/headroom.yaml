@@ -1,0 +1,181 @@
+---
+# Headroom — el sidecar de compresión de contexto de LiteLLM.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# POR QUÉ ESTO DESBLOQUEA UN 502 REAL
+#
+# El guardrail `headroom-compression` de LiteLLM vive en el PostgreSQL del proxy
+# (`LiteLLM_GuardrailsTable`) con `api_base: http://headroom:8787`. Ese nombre es el
+# del servicio del compose de `frontdoor`, que en el clúster no existía: la
+# resolución DNS fallaba dentro del pod de LiteLLM y el guardrail, declarado
+# `unreachable_fallback: fail_closed` sobre `mode: pre_call`, cortaba la petición
+# antes de llegar al modelo — el `502 Headroom compression service unreachable`.
+#
+# El Service de abajo se llama **`headroom`**, en el **mismo namespace que el proxy**,
+# así que `http://headroom:8787` resuelve tal cual y **no hay que tocar la fila de la
+# DB**. El fix es declarar el servicio que falta, no editar configuración.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTENTICACIÓN: por qué el Service no lleva token
+#
+# Headroom avisa en su arranque `non-loopback bind with NO token — /v1/* is
+# UNAUTHENTICATED`. En el host legacy estaba bindeado a `127.0.0.1:8787`, así que no
+# importaba; acá bindea `0.0.0.0` porque el guardrail tiene que alcanzarlo desde otro
+# pod (`HEADROOM_COMPRESS_ALLOW_REMOTE=1`).
+#
+# El cliente del guardrail (`litellm/proxy/guardrails/guardrail_hooks/headroom/`)
+# manda `Authorization: Bearer <api_key>` **solo si `api_key` está seteado**, y en la
+# fila de la DB `auth_token` es `null`. Poner un token en el servidor rompería el
+# guardrail con un 401 salvo que se toque también la DB.
+#
+# Por eso el acceso se cierra por **red** y no por credencial: la NetworkPolicy de
+# `headroom-networkpolicy.yaml` admite únicamente al pod de LiteLLM, y el Service es
+# `ClusterIP` sin Ingress — nunca sale del clúster ni del tailnet.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: headroom-cache
+  namespace: litellm
+  labels:
+    app.kubernetes.io/name: headroom
+    app.kubernetes.io/part-of: headroom
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: headroom
+  namespace: litellm
+  labels:
+    app.kubernetes.io/name: headroom
+    app.kubernetes.io/part-of: headroom
+spec:
+  replicas: 1
+  # El estado de headroom es caché y contabilidad (una sqlite + jsonl, 71 MB
+  # medidos en el host legacy): no es fuente de verdad, pero perderlo en cada
+  # reinicio es gratis de evitar. PVC de 2 Gi sobre Longhorn.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: headroom
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: headroom
+        app.kubernetes.io/part-of: headroom
+      # SIN anotaciones de scrape, a propósito.
+      #
+      # Prometheus NO puede scrapear este pod: la NetworkPolicy de
+      # `headroom-networkpolicy.yaml` cierra el 8787 a todo lo que no sea el pod del
+      # proxy, y Prometheus vive en el namespace `monitoring`. Medido: desde el pod de
+      # Prometheus `http://<pod-ip>:8787/metrics` → **Connection refused**; desde el pod
+      # de LiteLLM, el mismo URL → **200**. Anotarlo crea un target `up == 0`
+      # permanente: un falso positivo de por vida, y encima un `up == 0` que tampoco
+      # habría disparado en el incidente (cuando el sidecar no existía, la serie no
+      # existía).
+      #
+      # La alerta va por **kube-state-metrics**, que ya se scrapea y no depende de ese
+      # canal: ver la regla `HeadroomDown` en `apps/monitoring/prometheus.yaml`.
+    spec:
+      containers:
+        - name: headroom
+          image: registry.coyote-paridae.ts.net/headroom:0.34.0
+          # Registry interno (ADR 0010). GHCR queda como mirror/rollback.
+          # Si el pod queda en ImagePullBackOff: verificar que el registry está
+          # alcanzable desde el nodo destino (kubectl run tmp-pull-test --image=...).
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8787
+          env:
+            # Las seis variables del compose de `frontdoor`, sin cambios. `MODE=token`
+            # es el modo de compresión, no autenticación (ver encabezado).
+            - name: HEADROOM_HOST
+              value: "0.0.0.0"
+            - name: HEADROOM_PORT
+              value: "8787"
+            - name: HEADROOM_TELEMETRY
+              value: "off"
+            - name: HEADROOM_MODE
+              value: "token"
+            # El guardrail llama desde OTRO pod: sin esto headroom rechaza el origen.
+            - name: HEADROOM_COMPRESS_ALLOW_REMOTE
+              value: "1"
+            # Por defecto headroom protege los mensajes de usuario y sistema del
+            # recorte; el compose los habilitó explícitamente y esa es la conducta
+            # que el proxy espera.
+            - name: HEADROOM_COMPRESS_USER_MESSAGES
+              value: "1"
+          # ── PROBES EN 127.0.0.1, A PROPÓSITO ────────────────────────────────
+          # Es el healthcheck del compose, verbatim. Además de ser la conducta que
+          # ya estaba validada, tiene una propiedad que importa: un probe `exec`
+          # contra loopback **no pasa por la red del pod**, así que la NetworkPolicy
+          # no puede romperlo. Con un probe HTTP (que llega desde el kubelet, o sea
+          # desde el nodo) una policy restrictiva sí puede dejar el pod
+          # `NotReady` para siempre — un footgun conocido. Acá no aplica.
+          livenessProbe:
+            exec:
+              command:
+                - python3
+                - -c
+                - |
+                  import urllib.request,sys
+                  urllib.request.urlopen('http://127.0.0.1:8787/readyz', timeout=3)
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - python3
+                - -c
+                - |
+                  import urllib.request,sys
+                  urllib.request.urlopen('http://127.0.0.1:8787/readyz', timeout=3)
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              # El compose declaraba 2g. Se respeta: la compresión de contexto es
+              # intensiva en memoria y quedarse corto se ve como OOMKilled en el
+              # peor momento.
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: cache
+              mountPath: /root/.headroom
+      volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: headroom-cache
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: headroom
+  namespace: litellm
+  labels:
+    app.kubernetes.io/name: headroom
+    app.kubernetes.io/part-of: headroom
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: headroom
+  ports:
+    - name: http
+      port: 8787
+      targetPort: http

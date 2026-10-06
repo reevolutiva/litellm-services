@@ -1,0 +1,36 @@
+---
+# LiteLLM — exposición INTERNA por Tailscale Operator (solo tailnet).
+#
+# POR QUÉ NO ALCANZABA CON UN `Service` DE TIPO LoadBalancer
+# Antes esto era un Service `litellm-tailscale` con
+# `loadBalancerClass: tailscale` y las anotaciones `tailscale.com/expose`. Ese modo
+# es un **proxy TCP crudo**: el operator levanta un nodo del tailnet que reenvía
+# los bytes al `targetPort` sin terminar TLS. Como el puerto publicado era el 443
+# y el backend habla HTTP plano, cualquier cliente que entrara por `https://`
+# recibía el error de OpenSSL `wrong version number` (habla TLS con quien responde
+# HTTP). Verificado: `curl https://litellm.<tailnet>.ts.net/health` → 000.
+#
+# El modo que sí termina TLS (y por eso lo usan headlamp, grafana, prometheus,
+# longhorn, wordpress y el dashboard de traefik) es el **Ingress** con
+# `ingressClassName: tailscale`: el operator publica un nodo del tailnet con
+# certificado de MagicDNS y hace HTTPS de punta a punta hasta el Service.
+#
+# Verificación:
+#   kubectl -n litellm get ingress litellm-tailscale
+#   curl -sS -o /dev/null -w "%{http_code}\n" https://litellm.<tailnet>.ts.net/health
+#   # 401 = funciona: TLS OK, el proxy entrega a LiteLLM y LiteLLM pide credencial
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: litellm-tailscale
+  namespace: litellm
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: litellm
+      port:
+        number: 4000
+  tls:
+    - hosts:
+        - litellm

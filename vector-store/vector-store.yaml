@@ -1,0 +1,180 @@
+---
+# Vector-store — la memoria vectorial de los agentes (Mem0 OSS sobre PGVector).
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# QUÉ ES
+#
+# Es un servicio HTTP (OpenAI-compatible Vector Stores API, FastAPI + Prisma +
+# PGVector) que almacena y busca embeddings. Mem0 OSS (dentro de hermes-gateway)
+# lo usa como backend de memoria persistente.
+#
+# En este PR la base vectorstore tiene su propia instancia PostgreSQL/PGVector,
+# PVC, usuario y ExternalSecret en clase `desarrollo`; no comparte la instancia
+# ni el PVC del proxy LiteLLM.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# UBICACIÓN
+#
+# Namespace `litellm` (junto al proxy y headroom — decisión del dueño
+# 2026-09-29), clase `desarrollo` (ADR 0012: el plano de memoria de Hermes/Mem0
+# pertenece a la clase de desarrollo, no a producción). La clase se declara en
+# `clusters/imac27/apps.yaml` como patch del Deployment, no acá (regla 6).
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# IMAGEN
+#
+# La imagen se construye desde `apps/vector-store/build-context/` y se publica
+# en el registry interno (registry.coyote-paridae.ts.net/vector-store:<tag>).
+# No hay imagen pública: este código no se publica en PyPI ni GHCR.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# DATABASE_URL
+#
+# Apunta a `vectorstore-postgresql.databases.svc.cluster.local`, la instancia
+# dedicada con su PVC propio en clase `desarrollo`, base `vectorstore`, schema
+# `vectorstore`. ESO materializa DATABASE_URL desde el secreto AKV
+# `databases-vectorstore-postgresql-password`; no reutiliza credenciales de LiteLLM.
+#
+# `secretKeyRef` no tiene `namespace`; el ExternalSecret `vectorstore-db-url`
+# crea la clave local en este namespace consumidor.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EMBEDDING__BASE_URL
+#
+# Apunta al proxy de LiteLLM en el mismo namespace (`litellm.litellm.svc.cluster.local:4000`),
+# que enruta a BGE-M3 (el modelo de embeddings). La API key del proxy
+# (`EMBEDDING__API_KEY`) viene del Secret `vector-store-env`, llave `EMBEDDING_API_KEY`,
+# que ESO materializa desde `litellm-vectorstore-api-key` en AKV.
+# Es una credencial dedicada, no la master key del proxy — principio de mínimo privilegio.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vector-store-data
+  namespace: litellm
+  labels:
+    app.kubernetes.io/name: vector-store
+    app.kubernetes.io/part-of: vector-store
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vector-store
+  namespace: litellm
+  labels:
+    app.kubernetes.io/name: vector-store
+    app.kubernetes.io/part-of: vector-store
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vector-store
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vector-store
+        app.kubernetes.io/part-of: vector-store
+    spec:
+      initContainers:
+        - name: prisma-schema
+          image: registry.coyote-paridae.ts.net/vector-store:1.0.1
+          imagePullPolicy: IfNotPresent
+          command: ["prisma", "db", "push"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vectorstore-db-url
+                  key: DATABASE_URL
+      containers:
+        - name: vector-store
+          image: registry.coyote-paridae.ts.net/vector-store:1.0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            # ── Database ──────────────────────────────────────────────────
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vectorstore-db-url
+                  key: DATABASE_URL
+            # ── Embeddings via LiteLLM proxy ──────────────────────────────
+            - name: EMBEDDING__BASE_URL
+              value: "http://litellm.litellm.svc.cluster.local:4000"
+            - name: EMBEDDING__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vector-store-env
+                  key: EMBEDDING_API_KEY
+            - name: EMBEDDING__MODEL
+              value: "bge-m3"
+            - name: EMBEDDING__DIMENSIONS
+              value: "1024"
+            # ── Server ────────────────────────────────────────────────────
+            - name: SERVER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vector-store-env
+                  key: API_KEY
+            - name: PORT
+              value: "8000"
+            - name: HOST
+              value: "0.0.0.0"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: vector-store-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vector-store
+  namespace: litellm
+  labels:
+    app.kubernetes.io/name: vector-store
+    app.kubernetes.io/part-of: vector-store
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: vector-store
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
