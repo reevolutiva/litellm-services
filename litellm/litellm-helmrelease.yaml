@@ -77,39 +77,61 @@ spec:
             model: azure_ai/gpt-5.6-luna
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
-        # `additional_drop_params: [reasoning_effort]` porque gpt-6-luna en Azure
-        # Foundry rechaza function tools con reasoning_effort en /v1/chat/completions
-        # (solo acepta /v1/responses o reasoning_effort: none).
-        # Hermes ya no envía reasoning_effort global, pero este drop es defensivo.
+        # gpt-6-luna: Azure Foundry RECHAZA function tools en /v1/chat/completions
+        # salvo que el reasoning_effort efectivo sea `none`. Medido contra el proxy
+        # el 2026-10-13 (LiteLLM v1.103.0-rc.1):
+        #   tools + (effort ausente → default `medium`)  -> 400 invalid_request_error
+        #   tools + reasoning_effort=medium              -> 400 invalid_request_error
+        #   tools + reasoning_effort=none                -> 200 con tool_call
+        # Dropear `reasoning_effort` NO arregla nada: sin el param Azure aplica su
+        # default (`medium`) y sigue rechazando. Tampoco sirve `drop_params`, que
+        # además oculta el rechazo en vez de exponerlo.
+        # La solución documentada (auto-router: "declare one model_list entry per
+        # rung, identical except for the reasoning parameter") son DOS entradas:
+        #   - `azure_ai/gpt-6-luna`        -> razona (sin function tools)
+        #   - `azure_ai/gpt-6-luna-tools`  -> function tools (razonamiento apagado)
+        # Los clientes agénticos (Hermes, OpenCode) siempre mandan tools: usar el
+        # rung `-tools`.
         - model_name: azure_ai/gpt-6-luna
           litellm_params:
             model: azure_ai/gpt-6-luna
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
-            additional_drop_params: [reasoning_effort]
+        # `reasoning_effort` en litellm_params se mergea en el request saliente
+        # (cualquier valor explícito del cliente gana sobre este default).
+        - model_name: azure_ai/gpt-6-luna-tools
+          litellm_params:
+            model: azure_ai/gpt-6-luna
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+            reasoning_effort: none
         - model_name: azure_ai/gpt-5.6-terra-2
           litellm_params:
             model: azure_ai/gpt-5.6-terra-2
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
-        # `additional_drop_params: [reasoning_effort]` porque gpt-6.1-sol en Azure
-        # Foundry rechaza function tools con reasoning_effort en /v1/chat/completions
-        # (solo acepta /v1/responses o reasoning_effort: none).
+        # gpt-6.1-sol NO puede servir function tools por /v1/chat/completions, con
+        # ningún reasoning_effort (medido 2026-10-13):
+        #   tools + effort default/medium -> 400 invalid_request_error
+        #   tools + reasoning_effort=none -> 400 "does not support 'none' with this model"
+        # Sí funciona con tools por /v1/responses (200 medido). Por eso NO va en los
+        # tiers del router, que sirven tráfico de agentes por /v1/chat/completions:
+        # un tier que lo elija devuelve 400. Para usarlo con tools, llamar al router
+        # por /v1/responses.
         - model_name: azure_ai/gpt-6.1-sol
           litellm_params:
             model: azure_ai/gpt-6.1-sol
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
-            additional_drop_params: [reasoning_effort]
-        # `additional_drop_params: [reasoning_effort]` porque gpt-6-astra en Azure
-        # Foundry rechaza function tools con reasoning_effort en /v1/chat/completions
-        # (solo acepta /v1/responses o reasoning_effort: none).
+        # gpt-6-astra: mismo caso que gpt-6.1-sol — sin function tools por
+        # /v1/chat/completions con ningún reasoning_effort (default/medium = 400,
+        # none = "does not support 'none' with this model"). Con tools solo por
+        # /v1/responses (200 medido). Fuera de los tiers del router.
         - model_name: azure_ai/gpt-6-astra
           litellm_params:
             model: azure_ai/gpt-6-astra
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
-            additional_drop_params: [reasoning_effort]
         - model_name: azure_ai/gpt-5-nano
           litellm_params:
             model: azure_ai/gpt-5-nano
@@ -195,12 +217,11 @@ spec:
         - model_name: rc_azure_implementer
           litellm_params:
             model: auto_router/complexity_router
-            # `additional_drop_params: [reasoning_effort]` — los modelos gpt-6.x en
-            # Azure Foundry rechazan function tools con reasoning_effort en
-            # /v1/chat/completions (solo aceptan /v1/responses o reasoning_effort: none).
-            # El router forwardea los params del request al modelo destino, así que
-            # dropear reasoning_effort aquí cubre todos los tiers de una vez.
-            additional_drop_params: [reasoning_effort]
+            # SIN `additional_drop_params: [reasoning_effort]`: dropear el param no
+            # arregla el 400 de los gpt-6.x (sin él Azure aplica su default `medium`
+            # y sigue rechazando function tools) y, con `drop_params: true` como en
+            # el ejemplo del doc, convertiría el rechazo en un param descartado en
+            # silencio — justo el fallo que este cambio viene a exponer y corregir.
             complexity_router_config:
               classifier_type: jev
               jev_classifier_config:
@@ -223,6 +244,18 @@ spec:
                 MEDIUM: coder
                 COMPLEX: complejo
                 REASONING: razonamiento
+              # Los tiers sirven tráfico de AGENTES, que siempre manda function tools
+              # por /v1/chat/completions. Todo modelo de un tier tiene que aceptar
+              # tools con el reasoning_effort que reciba, o el tier devuelve 400.
+              #
+              # Medido el 2026-10-13 (matriz tools en /v1/chat/completions):
+              #   aceptan tools con y sin effort explícito: gpt-5.4-nano, gpt-5.4-mini,
+              #     gpt-5.5, gpt-5-nano, gpt-5-mini, gpt-5.3-codex, gpt-5.1-codex-mini,
+              #     deepseek-v4-pro/flash, kimi-k2.6, kimi-k2.7-code, MAI-Thinking-1,
+              #     Llama-3.3-70B-Instruct, Phi-4-mini-instruct
+              #   aceptan tools solo SIN effort explícito: gpt-5.6-luna, gpt-5.6-terra-2
+              #   aceptan tools solo con effort `none`: gpt-6-luna (rung -tools)
+              #   NO aceptan tools nunca (solo /v1/responses): gpt-6.1-sol, gpt-6-astra
               tiers:
                 SIMPLE:
                   - azure_ai/gpt-5.4-nano
@@ -230,12 +263,19 @@ spec:
                 MEDIUM:
                   - azure_ai/gpt-5.3-codex
                   - azure_ai/gpt-5.1-codex-mini
+                # gpt-6-luna se mantiene en COMPLEX por el rung `-tools` (calidad
+                # gpt-6 con razonamiento apagado), acompañado de un modelo que sí
+                # combina tools + razonamiento.
                 COMPLEX:
-                  - azure_ai/gpt-6-luna
-                  - azure_ai/gpt-6.1-sol
+                  - azure_ai/gpt-6-luna-tools
+                  - azure_ai/deepseek-v4-pro
+                # gpt-6.1-sol y gpt-6-astra quedan FUERA: no pueden servir tools por
+                # /v1/chat/completions, así que cualquier request agéntico que cayera
+                # en este tier fallaba. Siguen disponibles como alias directos
+                # (razonamiento sin tools) y con tools vía /v1/responses.
                 REASONING:
-                  - azure_ai/gpt-6.1-sol
-                  - azure_ai/gpt-6-astra
+                  - azure_ai/deepseek-v4-pro
+                  - azure_ai/MAI-Thinking-1
               keyword_tier_rules:
                 - tier: REASONING
                   keywords: ["Diseña", "Delega", "orquesta", "Planifica", "Analiza", "Contrasta", "Compara", "Identifica", "Razona", "Argumenta", "contrarresta", "debate"]
