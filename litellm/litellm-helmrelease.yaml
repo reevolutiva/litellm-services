@@ -77,9 +77,24 @@ spec:
             model: azure_ai/gpt-5.6-luna
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-6-luna
+          litellm_params:
+            model: azure_ai/gpt-6-luna
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
         - model_name: azure_ai/gpt-5.6-terra-2
           litellm_params:
             model: azure_ai/gpt-5.6-terra-2
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-6.1-sol
+          litellm_params:
+            model: azure_ai/gpt-6.1-sol
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-6-astra
+          litellm_params:
+            model: azure_ai/gpt-6-astra
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
         - model_name: azure_ai/gpt-5-nano
@@ -183,7 +198,7 @@ spec:
               session_affinity: false
               tier_distance_penalty: 0.5
               match_threshold: 0.5
-              embedding_model: ollama/bge-m3
+              embedding_model: azure_ai/text-embedding-3-small
               tier_labels:
                 SIMPLE: basico
                 MEDIUM: coder
@@ -193,19 +208,15 @@ spec:
                 SIMPLE:
                   - azure_ai/gpt-5.4-nano
                   - azure_ai/gpt-5-mini
-                  - azure_ai/deepseek-v4-flash
                 MEDIUM:
                   - azure_ai/gpt-5.3-codex
                   - azure_ai/gpt-5.1-codex-mini
-                  - azure_ai/kimi-k2.7-code
                 COMPLEX:
-                  - azure_ai/gpt-5.6-luna
-                  - azure_ai/gpt-5.6-terra-2
-                  - azure_ai/deepseek-v4-pro
+                  - azure_ai/gpt-6-luna
+                  - azure_ai/gpt-6.1-sol
                 REASONING:
-                  - azure_ai/gpt-5.6-terra-2
-                  - azure_ai/deepseek-v4-pro
-                  - azure_ai/MAI-Thinking-1
+                  - azure_ai/gpt-6.1-sol
+                  - azure_ai/gpt-6-astra
               keyword_tier_rules:
                 - tier: REASONING
                   keywords: ["Diseña", "Delega", "orquesta", "Planifica", "Analiza", "Contrasta", "Compara", "Identifica", "Razona", "Argumenta", "contrarresta", "debate"]
@@ -274,13 +285,13 @@ spec:
     # del clúster es alto y el nodo de desarrollo ya sufrió DiskPressure/SystemOOM.
     resources:
       requests:
-        cpu: "1"
-        memory: 4Gi
-        ephemeral-storage: 2Gi
-      limits:
         cpu: "2"
         memory: 8Gi
         ephemeral-storage: 4Gi
+      limits:
+        cpu: "4"
+        memory: 12Gi
+        ephemeral-storage: 6Gi
     db:
       useExisting: true
       deployStandalone: false
