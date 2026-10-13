@@ -281,6 +281,14 @@ spec:
       repository: ghcr.io/berriai/litellm
       tag: v1.103.0-rc.1
     replicaCount: 1
+    # Con estos requests el nodo de produccion no admite un pod de surge.
+    # maxUnavailable: 1 permite liberar la replica actual antes de crear la nueva;
+    # se acepta una interrupcion breve para completar el rollout.
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 0
+        maxUnavailable: 1
     # LiteLLM debe co-localizarse con PostgreSQL y Redis: el RTT entre nodos
     # del clúster es alto y el nodo de desarrollo ya sufrió DiskPressure/SystemOOM.
     resources:
