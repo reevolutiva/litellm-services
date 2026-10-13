@@ -30,6 +30,204 @@ spec:
             # Dimensión 1024 fijada por ADR 0013 — Mem0/PGVector esperan este valor.
             # No cambiar sin reindexar los recuerdos existentes.
             dimensions: 1024
+
+        # =====================================================================
+        # Azure AI Foundry — `reevolutiva-ai.services.ai.azure.com`.
+        #
+        # Cada deployment ACTIVO como modelo INDEPENDIENTE: se pide por nombre y
+        # el router de abajo puede fijar uno por tier. La key sale del Secret
+        # `litellm-env` (AKV `litellm-env`, clave `AZURE_AI_API_KEY`) — nunca va
+        # en el repo.
+        #
+        # VERIFICADO el 2026-10-09 contra el endpoint real con esa key: cada
+        # modelo de esta lista respondió 200. Los deployments que existían en la
+        # configuración vieja pero YA NO están en Azure (`kimi-k3`, `mimo-v2.5`,
+        # `qwen3.8-max`, `minimax-m3`, `grok-4-1-fast-reasoning`,
+        # `gpt-5.4-nano-2026-03-17`) NO se declaran: un alias que apunta a un
+        # deployment inexistente falla en tiempo de request y ensucia los tiers
+        # del router.
+        # =====================================================================
+        - model_name: azure_ai/kimi-k2.6
+          litellm_params:
+            model: azure_ai/kimi-k2.6
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/kimi-k2.7-code
+          litellm_params:
+            model: azure_ai/kimi-k2.7-code
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-5.4-nano
+          litellm_params:
+            model: azure_ai/gpt-5.4-nano
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-5.4-mini
+          litellm_params:
+            model: azure_ai/gpt-5.4-mini
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-5.5
+          litellm_params:
+            model: azure_ai/gpt-5.5
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-5.6-luna
+          litellm_params:
+            model: azure_ai/gpt-5.6-luna
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-5.6-terra-2
+          litellm_params:
+            model: azure_ai/gpt-5.6-terra-2
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-5-nano
+          litellm_params:
+            model: azure_ai/gpt-5-nano
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-5-mini
+          litellm_params:
+            model: azure_ai/gpt-5-mini
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-5.3-codex
+          litellm_params:
+            model: azure_ai/gpt-5.3-codex
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/gpt-5.1-codex-mini
+          litellm_params:
+            model: azure_ai/gpt-5.1-codex-mini
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/MAI-Thinking-1
+          litellm_params:
+            model: azure_ai/MAI-Thinking-1
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/Phi-4-reasoning
+          litellm_params:
+            model: azure_ai/Phi-4-reasoning
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/Phi-4-mini-instruct
+          litellm_params:
+            model: azure_ai/Phi-4-mini-instruct
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/Llama-3.3-70B-Instruct
+          litellm_params:
+            model: azure_ai/Llama-3.3-70B-Instruct
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/deepseek-v4-flash
+          litellm_params:
+            model: azure_ai/deepseek-v4-flash
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/deepseek-v4-pro
+          litellm_params:
+            model: azure_ai/deepseek-v4-pro
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/embed-v-4-0
+          litellm_params:
+            model: azure_ai/embed-v-4-0
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+        - model_name: azure_ai/text-embedding-3-small
+          litellm_params:
+            model: azure_ai/text-embedding-3-small
+            api_base: https://reevolutiva-ai.services.ai.azure.com/
+            api_key: os.environ/AZURE_AI_API_KEY
+
+        # =====================================================================
+        # `rc_azure_implementer` — el router que usa el equipo (Hermes lo tiene
+        # como modelo por defecto). RECUPERADO del proxy de `frontdoor` el
+        # 2026-10-09 vía su API administrativa (`/model/info` descifra lo que en
+        # la DB está cifrado), no reconstruido a ojo.
+        #
+        # ES UN AUTO ROUTER (`auto_router/complexity_router`) y su clasificador
+        # es **JEV** (TypeSafe System One Choice): clasifica el prompt en un tier
+        # antes de despachar y elige modelo del pool de ese tier. La
+        # `TYPESAFE_API_KEY` ya está en el Secret `litellm-env`, así que además
+        # queda disponible el passthrough en `/typesafe/*`.
+        #
+        # DIFERENCIA contra el original, deliberada y por evidencia: los tiers
+        # referenciaban `kimi-k3` y `minimax-m3`, que ya no existen en Azure
+        # (404 medido). Se quitaron esos dos; el resto es idéntico.
+        #
+        # `adaptive: true` = Thompson-sampling dentro del tier con pesos
+        # costo/calidad; `session_affinity: false` = no fija la sesión al primer
+        # modelo (era `false` en el original, y así el prompt-cache no se cruza
+        # entre turnos de distinto tier).
+        # =====================================================================
+        - model_name: rc_azure_implementer
+          litellm_params:
+            model: auto_router/complexity_router
+            complexity_router_config:
+              classifier_type: jev
+              jev_classifier_config:
+                model: jev-latest
+                timeout_ms: 3000
+                circuit_breaker_enabled: true
+                circuit_breaker_cooldown_seconds: 30
+              classifier_fallback: heuristic
+              adaptive: true
+              adaptive_weights:
+                cost: 0.2
+                quality: 0.8
+              adaptive_eligible: all
+              session_affinity: false
+              tier_distance_penalty: 0.5
+              match_threshold: 0.5
+              embedding_model: ollama/bge-m3
+              tier_labels:
+                SIMPLE: basico
+                MEDIUM: coder
+                COMPLEX: complejo
+                REASONING: razonamiento
+              tiers:
+                SIMPLE:
+                  - azure_ai/gpt-5.4-nano
+                  - azure_ai/gpt-5-mini
+                  - azure_ai/deepseek-v4-flash
+                MEDIUM:
+                  - azure_ai/gpt-5.3-codex
+                  - azure_ai/gpt-5.1-codex-mini
+                  - azure_ai/kimi-k2.7-code
+                COMPLEX:
+                  - azure_ai/gpt-5.6-luna
+                  - azure_ai/gpt-5.6-terra-2
+                  - azure_ai/deepseek-v4-pro
+                REASONING:
+                  - azure_ai/gpt-5.6-terra-2
+                  - azure_ai/deepseek-v4-pro
+                  - azure_ai/MAI-Thinking-1
+              keyword_tier_rules:
+                - tier: REASONING
+                  keywords: ["Diseña", "Delega", "orquesta", "Planifica", "Analiza", "Contrasta", "Compara", "Identifica", "Razona", "Argumenta", "contrarresta", "debate"]
+                - tier: COMPLEX
+                  keywords: ["Explora", "Recopila", "Inestiga", "Da seguimiento", "Supervisa", "compacta", "Auditoria"]
+                - tier: MEDIUM
+                  keywords: ["Implementa", "Test", "escribe", "redacta", "documenta", "Ejecútalo", "monitorea"]
+              escalation_keywords:
+                - LITELLM ESCALATE
+                - LITELLM_SUPER
+              custom_technical_keywords: ["Docker", "K3s", "Paperclip", "Litellm", "Hermes", "Cluster", "Deploy", "E2E", "Azure", "Azd", "az"]
+              return_raw_model_name: false
+      # `store_model_in_db: false` — la fuente de verdad de los modelos es ESTE
+      # archivo (GitOps), no la base del proxy. Con el default (`true`) y la
+      # tabla `LiteLLM_ProxyModelTable` vacía, `/v1/models` respondía **vacío**
+      # a las virtual keys (medido el 2026-10-09): un cliente que descubre
+      # modelos —Hermes con `discover_models`— no veía ninguno aunque los
+      # completions funcionaran. La master key sí los veía porque no filtra por
+      # la DB. Con esto, lo que sirve el proxy es exactamente lo que está en Git.
+      general_settings:
+        store_model_in_db: false
+
       litellm_settings:
         # Cache de RESPUESTAS LLM en el Redis del clúster (antes iba a memoria
         # del proceso: /cache/ping reportaba LiteLLMCacheType.LOCAL).
@@ -72,6 +270,17 @@ spec:
       repository: ghcr.io/berriai/litellm
       tag: v1.103.0-rc.1
     replicaCount: 1
+    # LiteLLM debe co-localizarse con PostgreSQL y Redis: el RTT entre nodos
+    # del clúster es alto y el nodo de desarrollo ya sufrió DiskPressure/SystemOOM.
+    resources:
+      requests:
+        cpu: "1"
+        memory: 4Gi
+        ephemeral-storage: 2Gi
+      limits:
+        cpu: "2"
+        memory: 8Gi
+        ephemeral-storage: 4Gi
     db:
       useExisting: true
       deployStandalone: false
@@ -102,6 +311,9 @@ spec:
     # Redis viejo aunque el Secret esté correcto.
     environmentSecrets:
       - litellm-env
+      # Banderas propias: el chart solo inyecta lo que sale de aca (ver el
+      # encabezado de `flags-secret.yaml`).
+      - litellm-flags
     livenessProbe:
       httpGet:
         path: /health/readiness

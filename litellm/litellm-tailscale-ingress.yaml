@@ -24,6 +24,13 @@ kind: Ingress
 metadata:
   name: litellm-tailscale
   namespace: litellm
+  annotations:
+    # El nodo del tailnet que publica este Ingress lo crea el OPERATOR, así que
+    # su ubicación no la decide la Kustomization de la app: la decide este
+    # ProxyClass (clase `produccion`). Sin la anotación, el proxy cae donde
+    # quiera el scheduler — medido 2026-10-09: estaba en `vm-worker`
+    # (`desarrollo`) siendo LiteLLM un servicio crítico.
+    tailscale.com/proxy-class: produccion
 spec:
   ingressClassName: tailscale
   defaultBackend:
