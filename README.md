@@ -16,13 +16,14 @@ de Reevolutiva. Reemplaza al repositorio histórico `clusterlm-dev` (archivado).
 
 ```
 litellm-services/
-├── litellm/              # HelmRelease + Ingress del proxy LiteLLM
+├── litellm/              # Kustomize: HelmRelease, flags no sensibles e Ingress
 ├── headroom/             # Guardrail de compresión (headroom-ai)
 │   └── build-context/     # Dockerfile de la imagen
 ├── vector-store/         # Servicio de embeddings + PGVector
 │   └── build-context/     # Código Python, Prisma schema, Dockerfile
 ├── tracking-collector/   # Colector de métricas Matomo
 │   └── app/               # Código Python del collector
+├── AGENTS.md              # Reglas de contribución y despliegue
 └── README.md
 ```
 
@@ -38,12 +39,17 @@ docker push registry.coyote-paridae.ts.net/headroom:$(git rev-parse --short HEAD
 
 ## Despliegue
 
-Los manifiestos Kubernetes de este repo se referencian desde el repo GitOps
-`reevolutiva-infra/apps/<servicio>/`. No se aplican directamente con `kubectl`.
+El manifiesto de `litellm/` refleja la configuración vigente en
+`reevolutiva-infra/apps/litellm/` y es compilable localmente con Kustomize. Sin
+embargo, **Flux todavía despliega desde `reevolutiva-infra`**; este repo no es
+fuente de reconciliación ni publica cambios al clúster. Mantener ambos lados
+alineados mediante PR. Cualquier cambio de origen Flux requiere un PR separado
+en `reevolutiva-infra`. No aplicar estos manifiestos directamente con `kubectl`.
 
 ## Historial
 
 - **clusterlm-dev** (archivado): repositorio original con docker-compose para
   LiteLLM + headroom + vector-store en `frontdoor`.
 - **2026-10-06**: consolidación en este monorepo, todos bajo namespace `litellm`.
+- **2026-10-13**: configuración de LiteLLM sincronizada con los manifiestos activos de GitOps; Flux sigue reconciliando desde `reevolutiva-infra`.
 

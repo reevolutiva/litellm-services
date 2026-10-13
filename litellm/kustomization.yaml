@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - flags-secret.yaml
+  - litellm-helmrelease.yaml
+  # Exposición por Tailscale: Ingress (termina TLS), NO un Service LoadBalancer.
+  # Ver el encabezado del archivo.
+  - litellm-tailscale-ingress.yaml
+  # -------------------------------------------------------------------------
+  # ACÁ HABÍA UNA PUERTA PÚBLICA (`litellm-traefik-ingress.yaml`) con el host
+  # `jako.reevolutiva.cl`, apuntando a este Service. SE ELIMINÓ (2026-10-06):
+  # estaba construida sobre una premisa superada — que jako era LiteLLM.
+  #
+  # `jako.reevolutiva.cl` es el **webhook de Teams del gateway de Hermes**, que
+  # corre como servicio `systemd` en `vm-services` (fuera de K8s). El túnel le
+  # apunta por el **Ingress público de `apps/hermes/`** (un Service sin selector
+  # con `Endpoints` sobre la IP del tailnet de `vm-services`) — que rutea a
+  # Hermes, NO a un Service de este namespace. Ver `AGENTS.md`,
+  # `docs/plan-flota-y-minio.md` §3 y
+  # `docs/arquitectura-agentica.md`.
+  #
+  # Consecuencia de dejarla: si alguna vez el túnel se re-apuntaba al Traefik del
+  # clúster, jako habría ido a LiteLLM — publicando el proxy en el borde con la
+  # masterkey como única autenticación. LiteLLM se expone por Tailscale.
+  # -------------------------------------------------------------------------
