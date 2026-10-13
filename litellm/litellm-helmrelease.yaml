@@ -77,26 +77,39 @@ spec:
             model: azure_ai/gpt-5.6-luna
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
+        # `additional_drop_params: [reasoning_effort]` porque gpt-6-luna en Azure
+        # Foundry rechaza function tools con reasoning_effort en /v1/chat/completions
+        # (solo acepta /v1/responses o reasoning_effort: none).
+        # Hermes ya no envía reasoning_effort global, pero este drop es defensivo.
         - model_name: azure_ai/gpt-6-luna
           litellm_params:
             model: azure_ai/gpt-6-luna
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
+            additional_drop_params: [reasoning_effort]
         - model_name: azure_ai/gpt-5.6-terra-2
           litellm_params:
             model: azure_ai/gpt-5.6-terra-2
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
+        # `additional_drop_params: [reasoning_effort]` porque gpt-6.1-sol en Azure
+        # Foundry rechaza function tools con reasoning_effort en /v1/chat/completions
+        # (solo acepta /v1/responses o reasoning_effort: none).
         - model_name: azure_ai/gpt-6.1-sol
           litellm_params:
             model: azure_ai/gpt-6.1-sol
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
+            additional_drop_params: [reasoning_effort]
+        # `additional_drop_params: [reasoning_effort]` porque gpt-6-astra en Azure
+        # Foundry rechaza function tools con reasoning_effort en /v1/chat/completions
+        # (solo acepta /v1/responses o reasoning_effort: none).
         - model_name: azure_ai/gpt-6-astra
           litellm_params:
             model: azure_ai/gpt-6-astra
             api_base: https://reevolutiva-ai.services.ai.azure.com/
             api_key: os.environ/AZURE_AI_API_KEY
+            additional_drop_params: [reasoning_effort]
         - model_name: azure_ai/gpt-5-nano
           litellm_params:
             model: azure_ai/gpt-5-nano
