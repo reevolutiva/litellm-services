@@ -195,6 +195,12 @@ spec:
         - model_name: rc_azure_implementer
           litellm_params:
             model: auto_router/complexity_router
+            # `additional_drop_params: [reasoning_effort]` — los modelos gpt-6.x en
+            # Azure Foundry rechazan function tools con reasoning_effort en
+            # /v1/chat/completions (solo aceptan /v1/responses o reasoning_effort: none).
+            # El router forwardea los params del request al modelo destino, así que
+            # dropear reasoning_effort aquí cubre todos los tiers de una vez.
+            additional_drop_params: [reasoning_effort]
             complexity_router_config:
               classifier_type: jev
               jev_classifier_config:
