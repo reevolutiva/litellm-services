@@ -1,0 +1,50 @@
+[
+  {
+    "url": "https://litellm.coyote-paridae.ts.net/litellm-asset-prefix/_next/static/chunks/1kpvojzxb_2ce.js",
+    "status": 200,
+    "content_encoding": null,
+    "cache_control": null,
+    "content_length": "31363",
+    "len_body": 31363
+  },
+  {
+    "url": "https://litellm.coyote-paridae.ts.net/litellm-asset-prefix/_next/static/chunks/28fzwmvhc4sv1.js",
+    "status": 200,
+    "content_encoding": null,
+    "cache_control": null,
+    "content_length": "439503",
+    "len_body": 439503
+  },
+  {
+    "url": "https://litellm.coyote-paridae.ts.net/litellm-asset-prefix/_next/static/chunks/1xkrmcontg-7s.js",
+    "status": 200,
+    "content_encoding": null,
+    "cache_control": null,
+    "content_length": "30482",
+    "len_body": 30482
+  },
+  {
+    "url": "https://litellm.coyote-paridae.ts.net/litellm-asset-prefix/_next/static/chunks/1kabwy23ggmhn.js",
+    "status": 200,
+    "content_encoding": null,
+    "cache_control": null,
+    "content_length": "24889",
+    "len_body": 24889
+  },
+  {
+    "url": "https://litellm.coyote-paridae.ts.net/litellm-asset-prefix/_next/static/chunks/1kid9zr1--h6y.css",
+    "status": 200,
+    "content_encoding": null,
+    "cache_control": null,
+    "content_length": "2031",
+    "len_body": 2031
+  },
+  {
+    "url": "https://litellm.coyote-paridae.ts.net/litellm-asset-prefix/_next/static/chunks/3146e697tym4_.css",
+    "status": 200,
+    "content_encoding": null,
+    "cache_control": null,
+    "content_length": "196764",
+    "len_body": 196764
+  }
+]
