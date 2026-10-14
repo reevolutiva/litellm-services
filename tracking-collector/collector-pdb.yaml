@@ -1,0 +1,13 @@
+# Con dos réplicas, un drenaje de nodo no debe llevarse las dos a la vez: si
+# ambas se van juntas, los eventos que lleguen en esa ventana no tienen a quién
+# llegar (el plugin reintenta, pero la ventana se alarga sin motivo).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: tracking-collector
+  namespace: tracking
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tracking-collector

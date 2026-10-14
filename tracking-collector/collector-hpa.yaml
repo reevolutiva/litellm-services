@@ -1,0 +1,31 @@
+# El contenedor de tracking no tiene afinidad de sesión, así que escalar es
+# cambiar la cantidad de réplicas. El HPA existe para que un pico de eventos
+# (un lanzamiento, un webinar) no dependa de que alguien mire Grafana.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tracking-collector
+  namespace: tracking
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tracking-collector
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      # Un evento de conversión no se puede perder porque el HPA apagó la
+      # réplica que lo estaba reenviando: se baja despacio y de a una.
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60

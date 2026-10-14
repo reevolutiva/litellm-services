@@ -127,7 +127,7 @@ spec:
                 - -c
                 - |
                   import urllib.request,sys
-                  urllib.request.urlopen('http://127.0.0.1:8787/readyz', timeout=3)
+                  urllib.request.urlopen('http://127.0.0.1:8787/readyz', timeout=5)
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 10
@@ -139,7 +139,7 @@ spec:
                 - -c
                 - |
                   import urllib.request,sys
-                  urllib.request.urlopen('http://127.0.0.1:8787/readyz', timeout=3)
+                  urllib.request.urlopen('http://127.0.0.1:8787/readyz', timeout=5)
             initialDelaySeconds: 15
             periodSeconds: 30
             timeoutSeconds: 10

@@ -1,0 +1,60 @@
+# =============================================================================
+# Configuración NO secreta del contenedor de tracking (T0.6).
+#
+# `sites.json` es el mapa de inquilinos: slug (§5.1, `sitio.consultor_slug`) →
+# `idsite` de Matomo y dominio. Es lo que hace que el aislamiento sea por
+# `idsite` (G6, §7) y no por convención: el contenedor **no** acepta un idsite
+# que venga del cliente, solo resuelve el que está acá. Si el evento trae otro
+# `sitio.idsite_matomo`, se registra la discrepancia en el log y manda el de acá.
+#
+# Este mapa es el ESPEJO de `apps/matomo/tenants.json` —la fuente de verdad de la
+# multi-tenancy— y tiene que coincidir con él en dos cosas: el número de `idsite`
+# y el `dominio`. Un `idsite` que ya no existe hace que Matomo descarte el evento
+# sin dejar informe; un `dominio` que no es la URL del sitio deja el informe con
+# la URL equivocada. Los dos errores ya pasaron una vez (familey=3, un duplicado
+# borrado; urano.consulting, que no es la URL del sitio) y en los dos el síntoma
+# fue el mismo: el evento no aparecía donde debía y nada lo decía.
+#
+#   $ kubectl -n analytics get cm matomo-bootstrap -o jsonpath='{.data}' > /tmp/mb
+#   $ grep -o '"urls": \[[^]]*\]' /tmp/mb        # URLs reales por inquilino
+#
+# Los idsite NO se renumeran al borrar un sitio (Matomo no reutiliza ids): el
+# mapa real es 1=reevolutiva, 2=urano, 4=familey, 6=tracking — 3 y 5 quedaron
+# huérfanos y se borraron en t_399d3ffd.
+#
+# `tracking` (idsite 6) es el sitio de respaldo del propio plano de tracking
+# (`tenants.json`: "Tracking server-side (fallback)"). Es el destino de las
+# pruebas end-to-end del contenedor: probar contra un sitio de inquilino real
+# ensuciaría su informe con datos que no son suyos.
+#
+# El `dominio` es además la URL de respaldo de Matomo cuando el evento no trae
+# `pagina.url` (el envelope del §5.1 no tiene URL y Matomo la exige).
+#
+# Las dimensiones personalizadas (`dimension1..5`) se configuran por variable de
+# entorno en el Deployment: sus ids los administra Matomo, no este repo.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tracking-collector-config
+  namespace: tracking
+data:
+  sites.json: |
+    {
+      "reevolutiva": {
+        "idsite": 1,
+        "dominio": "reevolutiva.com"
+      },
+      "urano": {
+        "idsite": 2,
+        "dominio": "urano.cl"
+      },
+      "familey": {
+        "idsite": 4,
+        "dominio": "familey.cl"
+      },
+      "tracking": {
+        "idsite": 6,
+        "dominio": "tracking.reevolutiva.cl"
+      }
+    }
