@@ -9,7 +9,7 @@ Monorepo de los servicios LiteLLM, Headroom, vector-store y tracking-collector. 
 - No aplicar manifiestos con `kubectl` como cambio permanente. **Prohibido:** `kubectl apply`, `kubectl delete`, `kubectl patch`, `kubectl replace`, `kubectl create`, `kubectl edit`, `kubectl scale` y cualquier operación mutante/destructiva contra el clúster. Solo está permitido uso de lectura/diagnóstico (`kubectl get`, `describe`, `logs`, `diff`) cuando sea estrictamente necesario. Toda mutación de infraestructura se hace por PR en `reevolutiva-infra` y reconcilia Flux.
 - Despliegue: siempre rama → PR → revisión → merge a `main`. Flux reconcilia desde `reevolutiva-infra`; este repo no publica cambios directos al clúster. Prohibido push/merge directo a `main` y force push en ramas compartidas.
 - El despliegue siempre se resuelve con PR y merge a `main`; no existen aplicaciones manuales con `kubectl` como cambio permanente.
-- Guardrails OpenCode activos en este repo: `.opencode/opencode.json` (permisos globales) y `.opencode/agents/litellm-services.md` (reglas del agente). No burlear ni desactivar esos guardrails sin aprobación explícita.
+- Guardrails OpenCode activos en este repo: `.opencode/opencode.json` (permisos globales), `.opencode/agents/litellm-services.md` (rol, alcance y no negociables del agente) y `.opencode/agents/HEARTBEAT.md` (checklist de ejecución del rol). No burlear ni desactivar esos guardrails sin aprobación explícita.
 - Verificar el YAML/Kustomize local antes del PR y ejecutar los tests/build relevantes del servicio modificado.
 
 ## Seguridad
