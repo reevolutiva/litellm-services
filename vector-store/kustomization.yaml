@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# El namespace `litellm` NO se declara acá: vive en `infrastructure/configs/namespaces.yaml`
+# (regla del repo: un namespace por dominio, declarado en las infra configs).
+#
+# La API vector-store usa LiteLLM para embeddings y se mantiene en `litellm`; su
+# PGVector dedicado vive como `vectorstore-postgresql` en `databases`. Ambos
+# Deployments se colocan en clase `desarrollo` mediante el patch en
+# `clusters/produccion/apps.yaml`; ninguno modifica el PostgreSQL compartido de LiteLLM.
+resources:
+  - postgresql.yaml
+  - vector-store.yaml

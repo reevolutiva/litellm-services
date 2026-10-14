@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# El namespace `litellm` NO se declara acá: vive en `infrastructure/configs/namespaces.yaml`
+# (regla del repo: un namespace por dominio, declarado en las infra configs).
+#
+# Headroom va en el namespace del **proxy** a propósito: el guardrail de LiteLLM tiene
+# `api_base: http://headroom:8787`, y un Service `headroom` en el mismo namespace que el
+# pod que lo llama resuelve ese nombre sin tocar la configuración del guardrail.
+resources:
+  - headroom.yaml
+  - headroom-networkpolicy.yaml

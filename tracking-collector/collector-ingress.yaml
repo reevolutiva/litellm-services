@@ -1,0 +1,30 @@
+# =============================================================================
+# Ingress del tailnet para el contenedor de tracking.
+#
+# Para qué, si los sitios y el navegador entran por el REST de WordPress: para
+# operar y diagnosticar — probar un evento a mano, ver `/metrics`, mirar
+# `/readyz?probe=1` contra Matomo. No es el camino de producción ni una
+# exposición pública: es la interfaz interna del mismo patrón que el resto del
+# clúster (Tailscale Operator, nada abierto a internet).
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tracking-collector
+  namespace: tracking
+spec:
+  ingressClassName: tailscale
+  tls:
+    - hosts:
+        - tracking
+  rules:
+    - host: tracking
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: tracking-collector
+                port:
+                  number: 8080
