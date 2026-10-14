@@ -10,7 +10,7 @@ spec:
     spec:
       chart: litellm-helm
       # Chart explícito: sin `version` Flux tomaba siempre la última publicada
-      # (hoy 1.102.1) mientras la imagen va por v1.103.0-rc.1 — drift silencioso.
+      # (hoy 1.102.1) mientras la imagen iba por v1.103.0-rc.1 — drift silencioso.
       version: ">=1.102.1"
       sourceRef:
         kind: HelmRepository
@@ -79,7 +79,7 @@ spec:
             api_key: os.environ/AZURE_AI_API_KEY
         # gpt-6-luna: Azure Foundry RECHAZA function tools en /v1/chat/completions
         # salvo que el reasoning_effort efectivo sea `none`. Medido contra el proxy
-        # el 2026-10-13 (LiteLLM v1.103.0-rc.1):
+        # el 2026-10-13 (LiteLLM v1.103.0-rc.1, upgradeado a v1.105.1):
         #   tools + (effort ausente → default `medium`)  -> 400 invalid_request_error
         #   tools + reasoning_effort=medium              -> 400 invalid_request_error
         #   tools + reasoning_effort=none                -> 200 con tool_call
@@ -338,7 +338,7 @@ spec:
             unreachable_fallback: fail_closed
     image:
       repository: ghcr.io/berriai/litellm
-      tag: v1.103.0-rc.1
+      tag: v1.105.1
     replicaCount: 1
     # Con estos requests el nodo de produccion no admite un pod de surge.
     # maxUnavailable: 1 permite liberar la replica actual antes de crear la nueva;
