@@ -7,7 +7,7 @@ de Reevolutiva. Reemplaza al repositorio histórico `clusterlm-dev` (archivado).
 
 | Servicio | Namespace | Puerto | Imagen |
 |---|---|---|---|
-| **litellm** | `litellm` | 4000 | `ghcr.io/berriai/litellm:v1.103.0-rc.1` |
+| **litellm** | `litellm` | 4000 | `ghcr.io/berriai/litellm:v1.105.1` |
 | **headroom** (guardrail) | `litellm` | 8787 | `registry.coyote-paridae.ts.net/headroom:0.34.0` |
 | **vector-store** (PGVector) | `litellm` | 8000 | `registry.coyote-paridae.ts.net/vector-store:1.0.1` |
 | **tracking-collector** | `litellm` | 8080 | `registry.coyote-paridae.ts.net/tracking-collector:0.1.2` |

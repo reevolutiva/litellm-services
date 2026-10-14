@@ -7,7 +7,7 @@
 
 2. **Determinar cómo se sirven los estáticos dentro del pod**
    - Revisar el HelmRelease (y el chart `litellm-helm`) para entender si Next.js corre integrado y cuáles son las rutas (`litellm-asset-prefix`, `ui`).
-   - Inspeccionar la imagen `ghcr.io/berriai/litellm:v1.103.0-rc.1` o su documentación para ver si ya existe configuración de middleware (como `GZipMiddleware`, `StaticFiles`, `cache-control`).
+   - Inspeccionar la imagen `ghcr.io/berriai/litellm:v1.105.1` (versión objetivo del upgrade) o su documentación para ver si ya existe configuración de middleware (como `GZipMiddleware`, `StaticFiles`, `cache-control`).
    - Evaluar si alguna capa del entorno (Ingress tailscale, guardrail headroom, proxies) puede generar los headers faltantes.
 
 3. **Diseñar el arreglo de compresión y caché**
@@ -21,6 +21,6 @@
    - Documentar los comandos, URLs y resultados en el issue #7 y en cualquier evidencia de rendimiento necesaria.
 
 5. **Bloqueos y coordinación**
-   - Confirmar si la imagen `ghcr.io/berriai/litellm:v1.103.0-rc.1` requiere rebuild o actualización para soportar compresión/caché.
+   - Confirmar que la imagen `ghcr.io/berriai/litellm:v1.105.1` ya incluye gzip en respuestas buffereadas (commit `eb10333` en v1.105.0).
    - Coordinar los cambios de configuración con `reevolutiva/reevolutiva-infra`, ya que Flux despliega desde allí y todos los cambios deben reconciliarse por PR.
    - Validar los efectos desde un cliente real en el tailnet (ej.: Santiago/Chile) para reflejar la experiencia del usuario.
